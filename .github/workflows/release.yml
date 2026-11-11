@@ -1,0 +1,99 @@
+name: Publish installer release
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful Desktop installers run ID
+        required: true
+        default: '43006090338'
+      release_tag:
+        description: Release tag (vMAJOR.MINOR.PATCH or beta tag)
+        required: true
+        default: v0.1.0-beta.1
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-${{ inputs.release_tag }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BUILD_RUN_ID: ${{ inputs.build_run_id }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Verify successful build and release tag
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, re, subprocess
+          run_id = os.environ['BUILD_RUN_ID']
+          tag = os.environ['RELEASE_TAG']
+          assert run_id.isdigit(), 'Invalid build run ID'
+          assert re.fullmatch(r'v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?', tag), 'Invalid release tag'
+          repo = os.environ['GH_REPO']
+          run = json.loads(subprocess.check_output(['gh', 'api', f'repos/{repo}/actions/runs/{run_id}']))
+          assert run['conclusion'] == 'success' and run['status'] == 'completed', 'Build must pass all platforms'
+          assert run['path'] == '.github/workflows/desktop.yml', 'Unexpected build workflow'
+          assert run['head_repository']['full_name'] == repo and run['head_branch'] == 'main', 'Unexpected source'
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write('BUILD_SHA=' + run['head_sha'] + '\n')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.build_run_id }}
+          pattern: Apply-*
+          path: ${{ runner.temp }}/installers
+      - name: Prepare installers and checksums
+        env:
+          INSTALLER_ROOT: ${{ runner.temp }}/installers
+          RELEASE_ROOT: ${{ runner.temp }}/release
+        run: |
+          python - <<'PY'
+          import hashlib, os, shutil
+          from pathlib import Path
+          root = Path(os.environ['INSTALLER_ROOT'])
+          out = Path(os.environ['RELEASE_ROOT']); out.mkdir()
+          version = os.environ['RELEASE_TAG'][1:]
+          packages = [('Windows-x64', '*-setup.exe', 'Windows-x64.exe'),
+                      ('macOS-Apple-Silicon', '*.dmg', 'macOS-Apple-Silicon.dmg'),
+                      ('macOS-Intel', '*.dmg', 'macOS-Intel.dmg')]
+          checksums = []
+          for artifact, pattern, suffix in packages:
+              matches = list((root / ('Apply-' + artifact)).rglob(pattern))
+              assert len(matches) == 1 and matches[0].is_file(), f'Missing or ambiguous installer: {artifact}'
+              name = f'Apply-{version}-{suffix}'
+              dest = out / name; shutil.copyfile(matches[0], dest)
+              checksums.append(hashlib.file_digest(dest.open('rb'), 'sha256').hexdigest() + '  ' + name)
+          (out / 'SHA256SUMS.txt').write_text('\n'.join(checksums) + '\n')
+          (out / 'notes.md').write_text('''Бесплатный локальный помощник для откликов на hh.ru.
+
+          **Скачайте установщик своей платформы в разделе Assets ниже. Вход в GitHub для скачивания не нужен.**
+
+          - **Windows x64:** файл `.exe`.
+          - **Mac с Apple Silicon:** файл `macOS-Apple-Silicon.dmg`.
+          - **Mac с Intel:** файл `macOS-Intel.dmg`.
+
+          На Mac откройте DMG и перенесите Apply в «Программы». Python и Node.js устанавливать не нужно.
+
+          Внутри: профили резюме, подбор вакансий, шаблоны писем, сохранение очереди, журнал, пропуск анкет и ручной ввод капчи после двух пауз по 10 минут. Ожидание не гарантирует исчезновение капчи.
+
+          Это бета: Windows-пакет без сертификата издателя, Mac-пакеты с ad-hoc подписью без нотарификации Apple. Система может предупредить при первом запуске. Обновления устанавливаются вручную.
+
+          Личные резюме, токены и история разработчика в установщики не входят. Проверочные суммы находятся в `SHA256SUMS.txt`. Архивы Source code ниже — исходники, для установки выбирайте `.exe` или `.dmg`.
+          ''')
+          PY
+      - name: Create draft, verify assets, and publish
+        env:
+          RELEASE_ROOT: ${{ runner.temp }}/release
+        shell: bash
+        run: |
+          gh release create "$RELEASE_TAG" --draft --prerelease --target "$BUILD_SHA" --title "Apply ${RELEASE_TAG#v} — Windows и macOS" --notes-file "$RELEASE_ROOT/notes.md" "$RELEASE_ROOT"/*.exe "$RELEASE_ROOT"/*.dmg "$RELEASE_ROOT/SHA256SUMS.txt"
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets | length' | python -c 'import sys; assert int(sys.stdin.read()) == 4, "Incomplete release"'
+          gh release edit "$RELEASE_TAG" --draft=false
