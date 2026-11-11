@@ -18,3 +18,12 @@ with tempfile.TemporaryDirectory() as directory:
     assert not (root / 'auth-profile' / 'token.json').exists()
     assert not (root / 'state.sqlite3').exists()
 print('PASS: standalone engine, clean default profile, bundled UI, no developer credentials/history')
+
+# Tauri signs the packaged sidecar again; test that exact executable too.
+if sys.platform == 'darwin':
+    binary = ROOT / 'src-tauri/target/release/bundle/macos/Apply.app/Contents/MacOS/apply-backend'
+    with tempfile.TemporaryDirectory() as directory:
+        result = subprocess.run([str(binary), '--self-test'], env=dict(os.environ, APPLY_DATA_DIR=directory),
+                                capture_output=True, text=True, timeout=120, check=True)
+        assert json.loads(result.stdout.strip().splitlines()[-1])['ok']
+    print('PASS: signed app-bundled engine loads its Python runtime')
