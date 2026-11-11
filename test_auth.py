@@ -1,5 +1,6 @@
 """Authentication integration checks; no network or real SMS."""
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -71,7 +72,8 @@ class AuthenticationChecks(unittest.TestCase):
         self.saved_session()
         self.assertEqual(hh_auth.status(), {'authenticated': True, 'name': 'Тестовый соискатель'})
         self.assertNotIn('private-token', json.dumps(hh_auth.status()))
-        self.assertEqual((self.root / 'token.json').stat().st_mode & 0o777, 0o600)
+        if os.name != 'nt':  # Windows credentials use the system vault in desktop mode.
+            self.assertEqual((self.root / 'token.json').stat().st_mode & 0o777, 0o600)
 
     def test_disconnect_removes_api_credentials(self):
         self.saved_session()
