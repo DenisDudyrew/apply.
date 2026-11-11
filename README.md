@@ -6,7 +6,7 @@
 
 [![Desktop installers](https://github.com/DenisDudyrew/apply./actions/workflows/desktop.yml/badge.svg)](https://github.com/DenisDudyrew/apply./actions/workflows/desktop.yml)
 
-[Скачать сборку](https://github.com/DenisDudyrew/apply./actions/workflows/desktop.yml) · [Исходники](https://github.com/DenisDudyrew/apply.) · [Сообщить об ошибке](https://github.com/DenisDudyrew/apply./issues)
+**[Скачать приложение для Windows и Mac →](https://github.com/DenisDudyrew/apply./releases)** · [Исходники](https://github.com/DenisDudyrew/apply.) · [Сообщить об ошибке](https://github.com/DenisDudyrew/apply./issues)
 
 > **Статус: desktop beta 0.1.** Проект создаётся для бесплатной личной помощи и использования друзьями. Это независимый клиент, не официальный продукт hh.ru. Работа авторизации и откликов зависит от изменений сервиса.
 
@@ -31,18 +31,18 @@
 
 Готовые сборки содержат интерфейс и Python-движок. Пользователю не нужно отдельно устанавливать Python, Node.js или Rust.
 
-1. Откройте [Desktop installers](https://github.com/DenisDudyrew/apply./actions/workflows/desktop.yml) и выберите последний успешный запуск.
-2. В разделе **Artifacts** скачайте ZIP своей платформы:
+1. Откройте **[страницу загрузки](https://github.com/DenisDudyrew/apply./releases)** и выберите версию. Вход в GitHub для скачивания не нужен.
+2. В разделе **Assets** скачайте установщик:
 
-   | Артефакт | Платформа | Файл внутри |
-   | --- | --- | --- |
-   | `Apply-Windows-x64` | Windows x64 | `*-setup.exe` |
-   | `Apply-macOS-Apple-Silicon` | Mac с Apple Silicon | `.dmg` |
-   | `Apply-macOS-Intel` | Mac с Intel | `.dmg` |
+   | Ваш компьютер | Файл |
+   | --- | --- |
+   | Windows x64 | `Apply-…-Windows-x64.exe` |
+   | Mac с Apple Silicon | `Apply-…-macOS-Apple-Silicon.dmg` |
+   | Mac с Intel | `Apply-…-macOS-Intel.dmg` |
 
-3. Распакуйте ZIP. На Windows запустите установщик; на Mac откройте DMG и перенесите Apply в «Программы».
+3. На Windows запустите `.exe`; на Mac откройте DMG и перенесите Apply в «Программы».
 
-Для скачивания артефактов нужен вход в GitHub. Файлы хранятся 30 дней; новые сборки можно получить через запуск workflow.
+Архивы **Source code** содержат исходники и не нужны для установки. Файл `SHA256SUMS.txt` содержит проверочные суммы установщиков.
 
 Бета не имеет внешнего сертификата издателя: Windows-сборка не подписана сертификатом, macOS-сборка имеет ad-hoc подпись без нотарификации Apple. Система может предупредить при запуске. Автоматического обновления пока нет — новые установщики устанавливаются вручную.
 
@@ -182,6 +182,8 @@ npm run build --prefix frontend
 python scripts/build_desktop.py
 python scripts/test_frozen.py
 ```
+
+Для публикации готовых проверенных установщиков запустите workflow **Publish installer release**: укажите ID успешной сборки `Desktop installers` и тег версии. Он проверит результат всех платформ, подготовит файлы с понятными названиями и SHA-256, создаст черновик релиза и опубликует его после проверки наличия всех установщиков. Релиз привязывается к исходному коммиту сборки. Повторная публикация существующего тега автоматически не перезаписывает файлы.
 
 Готовые установщики находятся в `src-tauri/target/release/bundle/`. Проверка запускает автономный движок с чистым профилем; на macOS дополнительно проверяется движок внутри подписанного `.app`.
 
