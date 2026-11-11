@@ -27,9 +27,6 @@ jobs:
             name: macOS-Intel
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
-    defaults:
-      run:
-        working-directory: ${{ runner.temp }}/apply-source
     steps:
       # A trailing dot in the repository name is invalid as a Windows folder.
       - name: Check out source into a portable folder
@@ -51,16 +48,22 @@ jobs:
           cache-dependency-path: ${{ runner.temp }}/apply-source/frontend/package-lock.json
       - name: Install Rust
         shell: bash
+        working-directory: ${{ runner.temp }}/apply-source
         run: rustup update stable --no-self-update && rustup default stable
       - name: Install dependencies
+        working-directory: ${{ runner.temp }}/apply-source
         run: python -m pip install -r requirements-build.txt
       - name: Build frontend
+        working-directory: ${{ runner.temp }}/apply-source
         run: npm ci --prefix frontend && npm run build --prefix frontend
       - name: Run offline regression tests
+        working-directory: ${{ runner.temp }}/apply-source
         run: python -m unittest -q
       - name: Build standalone engine and installer
+        working-directory: ${{ runner.temp }}/apply-source
         run: python scripts/build_desktop.py
       - name: Test standalone engine on a clean profile
+        working-directory: ${{ runner.temp }}/apply-source
         run: python scripts/test_frozen.py
       - uses: actions/upload-artifact@v4
         with:
