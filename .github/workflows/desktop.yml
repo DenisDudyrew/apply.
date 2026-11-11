@@ -44,8 +44,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: ${{ runner.temp }}/apply-source/frontend/package-lock.json
+          package-manager-cache: false
       - name: Install Rust
         shell: bash
         working-directory: ${{ runner.temp }}/apply-source
