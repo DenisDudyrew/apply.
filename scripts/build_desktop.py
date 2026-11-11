@@ -45,8 +45,8 @@ def main():
     shutil.copy2(destination / ('apply-backend' + suffix), artifact)
     print('Backend ready:', artifact, flush=True)
     if not args.backend_only:
-        cli = ROOT / 'frontend' / 'node_modules' / '.bin' / ('tauri.cmd' if sys.platform == 'win32' else 'tauri')
-        subprocess.run([str(cli), 'build'], cwd=ROOT, check=True)
+        cli = ROOT / 'frontend' / 'node_modules' / '@tauri-apps' / 'cli' / 'tauri.js'
+        subprocess.run(['node', str(cli), 'build'], cwd=ROOT, check=True)
 
 
 if __name__ == '__main__':

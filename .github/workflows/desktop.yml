@@ -27,8 +27,20 @@ jobs:
             name: macOS-Intel
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: ${{ runner.temp }}/apply-source
     steps:
-      - uses: actions/checkout@v6
+      # A trailing dot in the repository name is invalid as a Windows folder.
+      - name: Check out source into a portable folder
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        env:
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          git clone --no-checkout "https://github.com/${SOURCE_REPOSITORY}.git" apply-source
+          git -C apply-source checkout "$SOURCE_COMMIT"
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
@@ -36,7 +48,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: ${{ runner.temp }}/apply-source/frontend/package-lock.json
       - name: Install Rust
         shell: bash
         run: rustup update stable --no-self-update && rustup default stable
@@ -54,7 +66,7 @@ jobs:
         with:
           name: Apply-${{ matrix.name }}
           path: |
-            src-tauri/target/release/bundle/nsis/*-setup.exe
-            src-tauri/target/release/bundle/dmg/*.dmg
+            ${{ runner.temp }}/apply-source/src-tauri/target/release/bundle/nsis/*-setup.exe
+            ${{ runner.temp }}/apply-source/src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 30

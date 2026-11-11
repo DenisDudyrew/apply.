@@ -68,7 +68,7 @@ def run():
             finally:
                 journal.db.close()
 
-        with patch.object(ui, 'ROOT', root), patch.object(hh_auth, 'status', side_effect=lambda: {'authenticated': authenticated['value'], 'name': 'Тестовый аккаунт' if authenticated['value'] else ''}), patch.object(hh_auth, 'authenticate', side_effect=auth), patch.object(hh_auth, 'disconnect', side_effect=lambda: authenticated.update(value=False)), patch.object(hh_apply, 'main', side_effect=fake_main):
+        with patch.object(ui, 'ROOT', root), patch.object(hh_auth, 'status', side_effect=lambda: {'authenticated': authenticated['value'], 'name': 'Тестовый аккаунт' if authenticated['value'] else ''}), patch.object(hh_auth, 'authenticate', side_effect=auth), patch.object(hh_auth, 'get', return_value={'items': [{'id': 'test-resume', 'title': 'Системный аналитик'}, {'id': 'dev-resume', 'title': 'Python Developer'}]}), patch.object(hh_auth, 'disconnect', side_effect=lambda: authenticated.update(value=False)), patch.object(hh_apply, 'main', side_effect=fake_main):
             ui.state.update(running=False, waiting=False, phase='idle', run={}, image='', logs=[])
             ui.stop_requested.clear()
             sock = socket.socket()
@@ -142,7 +142,24 @@ def run():
                     page.get_by_role('button', name='Сохранить настройки', exact=True).click()
                     expect(page.get_by_role('status').filter(has_text='Настройки сохранены')).to_be_visible()
                     assert json.loads((root / 'ui-settings.json').read_text())['limit'] == 89
+                    page.get_by_role('button', name='Новый профиль', exact=True).click()
+                    page.get_by_role('button', name='Загрузить резюме', exact=True).click()
+                    expect(page.get_by_label('Резюме hh.ru', exact=True)).to_be_enabled()
+                    page.get_by_label('Резюме hh.ru', exact=True).select_option('dev-resume')
+                    page.get_by_label('Название профиля', exact=True).fill('Разработка')
+                    page.get_by_label('Сопроводительное письмо', exact=True).select_option('always')
+                    page.get_by_label('Шаблон письма', exact=True).fill('Для {company}: {vacancy} / {resume}')
+                    page.get_by_role('button', name='Сохранить профиль и письмо', exact=True).click()
+                    expect(page.get_by_role('status').filter(has_text='Профиль и письмо сохранены')).to_be_visible()
+                    assert json.loads((root / 'config.json').read_text())['resume_id'] == 'dev-resume'
+                    assert json.loads((root / 'config.json').read_text())['letter_mode'] == 'always'
                     page.get_by_role('button', name='Обзор', exact=True).click()
+                    expect(page.get_by_label('Активный профиль', exact=True)).to_have_value(json.loads((root / 'profiles.json').read_text())['selected'])
+                    ui.progress(phase='captcha_wait', pause_until=time.time()+599, captcha_attempt=2)
+                    expect(page.get_by_text('Капча: пауза 2 из 2', exact=True)).to_be_visible()
+                    page.get_by_role('button', name='Заполнить сейчас', exact=True).click()
+                    assert ui.commands.get(timeout=2)['action'] == 'captcha_now'
+                    ui.progress(phase='idle', pause_until=None, captcha_attempt=0)
                     page.screenshot(path='/tmp/apply-qa-desktop.png', full_page=True)
                     page.set_viewport_size({'width': 390, 'height': 844})
                     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Mobile overflow'
