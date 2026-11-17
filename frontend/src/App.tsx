@@ -1,3 +1,4 @@
+import { version as appVersion } from "../package.json";
 import {
   ProfileBar,
   ProfileManager,
@@ -318,10 +319,10 @@ export default function App() {
             <span>
               Данные только
               <br />
-              на этом компьютере
+              {state?.android ? "на этом телефоне" : "на этом компьютере"}
             </span>
           </div>
-          <span className="version">APPLY LOCAL / V2.0</span>
+          <span className="version">APPLY LOCAL / V{appVersion}</span>
         </div>
       </aside>
       <main className="main-shell">
@@ -352,14 +353,23 @@ export default function App() {
             </span>
             <span className="top-date">{nowDate}</span>
             <button
-              className="avatar"
+              className={cn("avatar", state?.android && !authenticated && "android-login")}
               onClick={() => setLoginOpen(true)}
-              aria-label="Аккаунт hh.ru"
+              aria-label={state?.android && !authenticated ? "Войти в hh.ru" : "Аккаунт hh.ru"}
             >
-              {authenticated ? state?.auth.name?.[0] || "Я" : "Я"}
+              {authenticated ? state?.auth.name?.[0] || "Я" : state?.android ? "Войти" : "Я"}
             </button>
           </div>
         </header>
+        {state?.android && <details className="android-info">
+          <summary>Фоновая работа и уведомления</summary>
+          <p>Запуск продолжается при свёрнутом приложении. Ход работы и остановка — в уведомлении Apply.</p>
+          <p>Если телефон ограничивает фон, откройте настройки батареи для Apply.</p>
+          <button className="text-link" type="button" onClick={() => void perform({ action: "open_battery_settings" })}>
+            Настройки фоновой работы
+          </button>
+          <p>Ручные анкеты пропускаются и остаются в истории для проверки на hh.ru.</p>
+        </details>}
         <div className="page-content">
           <div className="page-heading">
             <div>

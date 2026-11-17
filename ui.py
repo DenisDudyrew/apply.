@@ -91,11 +91,17 @@ def reset_run(limit, operation):
 
 def announce(title, body):
     import os
+    if os.environ.get('APPLY_ANDROID') == '1':
+        from android_runtime import announce as android_announce
+        android_announce(title, body)
+        return
     if os.environ.get('APPLY_DESKTOP') == '1':
         print('APPLY_NOTICE ' + json.dumps({'title': title, 'body': body}, ensure_ascii=False), flush=True)
 
 
 def wait_captcha(seconds, attempt):
+    if attempt == 1:
+        announce('Обнаружена капча hh.ru', 'Запуск на паузе. Откройте Apply, чтобы заполнить капчу сейчас, или дождитесь проверки.')
     previous = state.get('phase', 'sending')
     deadline = time.monotonic() + seconds
     progress(phase='captcha_wait', captcha_attempt=attempt, pause_until=time.time() + seconds,
@@ -129,7 +135,12 @@ def dispatch(data):
             host = parsed.hostname or ''
             if parsed.scheme != 'https' or not (host == 'github.com' or host == 'hh.ru' or host.endswith('.hh.ru')):
                 raise ValueError('Неподдерживаемая внешняя ссылка.')
-            webbrowser.open(url)
+            import os
+            if os.environ.get('APPLY_ANDROID') == '1':
+                from android_runtime import open_external
+                open_external(url)
+            else:
+                webbrowser.open(url)
         elif action == 'load_resumes':
             if not hh_auth.status()['authenticated']:
                 raise ValueError('Сначала войдите в hh.ru.')
@@ -304,6 +315,8 @@ def prompt(message, image_data=None):
             state.update(waiting=False, image='', prompt_kind='browser', prompt_id=None)
 
 
+
+
 def resumes_worker():
     try:
         with hh_auth.client_scope(sys.modules[__name__]):
@@ -354,6 +367,8 @@ def worker(send, limit, options):
     import hh_apply
     phase = 'completed'
     message = 'Запуск завершён'
+    announce('Отклики запущены' if send else 'Поиск запущен',
+             'Apply сообщит о капче, остановке или завершении.' if send else 'Подбираем вакансии по вашему профилю.')
     try:
         hh_apply.main(['--send', '--limit', str(limit)] if send else [], ui=sys.modules[__name__], options=options)
         with mutex:
@@ -371,6 +386,12 @@ def worker(send, limit, options):
             state.update(running=False, waiting=False, message=message, phase=phase)
             progress(current=None, pause_until=None, finished_at=time.time())
         stop_requested.clear()
+        title = {'completed': 'Отклики завершены' if send else 'Поиск завершён',
+                 'stopped': 'Запуск остановлен', 'error': 'Запуск требует внимания'}[phase]
+        run = state.get('run', {})
+        announce(title, f"Подтверждено откликов: {run.get('sent', 0)}. Проверьте итог в Apply." if phase == 'completed' and send
+                 else 'Откройте Apply, чтобы посмотреть результат.' if phase == 'completed'
+                 else 'Очередь сохранена. Откройте Apply и проверьте причину остановки.')
 
 
 def main(port=55015, open_browser=True):

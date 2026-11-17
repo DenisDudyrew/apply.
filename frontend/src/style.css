@@ -2319,7 +2319,14 @@ select {
     flex-wrap: wrap;
   }
   .profile-bar .text-link {
-    margin-left: 54px;
+    grid-column: 2;
+    margin-left: 0;
+    justify-self: start;
+    white-space: normal;
+  }
+  .profile-bar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
   }
   .captcha-wait .btn,
   .queue-card .btn {
@@ -2331,4 +2338,32 @@ select {
   .inline-label {
     flex-wrap: wrap;
   }
+}
+
+.android-info {
+  margin: 12px 16px 0;
+  padding: 12px 14px;
+  border: 1px solid #354329;
+  border-radius: 10px;
+  color: #a9b59d;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.android-info summary {
+  cursor: pointer;
+  color: #d4e6c2;
+}
+.android-info p,
+.android-info .text-link {
+  margin-top: 10px;
+}
+.avatar.android-login {
+  width: auto;
+  min-width: 64px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: #182013;
+  background: var(--lime);
+  font-size: 12px;
 }

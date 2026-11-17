@@ -9,6 +9,31 @@ export function useLiveState() {
   const token = useRef(""),
     latest = useRef<AppState | null>(null);
   useEffect(() => {
+    if (window.ApplyAndroid) {
+      let alive = true;
+      const refresh = () => {
+        if (!alive || document.hidden) return;
+        try {
+          const result = JSON.parse(window.ApplyAndroid!.request("/api/state", ""));
+          if (!result.ok) throw Error(result.error);
+          latest.current = result.value;
+          setState(result.value);
+          setConnection("connected");
+          setError("");
+        } catch (e) {
+          setConnection("reconnecting");
+          setError(e instanceof Error ? e.message : "Нет связи с движком");
+        }
+      };
+      refresh();
+      const timer = setInterval(refresh, 1200);
+      document.addEventListener("visibilitychange", refresh);
+      return () => {
+        alive = false;
+        clearInterval(timer);
+        document.removeEventListener("visibilitychange", refresh);
+      };
+    }
     if (new URLSearchParams(window.location.search).has("desktop_loading"))
       return;
     const controller = new AbortController();
@@ -77,6 +102,11 @@ export function useLiveState() {
   }, []);
   const request = useCallback(
     async (path: string, options: RequestInit = {}) => {
+      if (window.ApplyAndroid) {
+        const result = JSON.parse(window.ApplyAndroid.request(path, typeof options.body === "string" ? options.body : ""));
+        if (!result.ok) throw Error(result.error || "Не удалось выполнить действие");
+        return result.value;
+      }
       const response = await fetch(path, {
         ...options,
         headers: {

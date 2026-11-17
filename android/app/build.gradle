@@ -1,0 +1,65 @@
+plugins {
+    id 'com.android.application'
+    id 'com.chaquo.python'
+}
+
+def releaseVersion = new groovy.json.JsonSlurper().parse(file('../../frontend/package.json')).version
+android {
+    namespace 'local.apply'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'io.github.denisdudyrew.apply'
+        minSdk 35
+        targetSdk 36
+        versionCode 200
+        versionName releaseVersion
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        ndk { abiFilters 'arm64-v8a', 'x86_64' }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets { main { assets.srcDirs += '../../.build/android-assets' } }
+    signingConfigs {
+        release {
+            if (System.getenv('APPLY_ANDROID_KEYSTORE')) {
+                storeFile file(System.getenv('APPLY_ANDROID_KEYSTORE'))
+                storePassword System.getenv('APPLY_ANDROID_STORE_PASSWORD')
+                keyAlias System.getenv('APPLY_ANDROID_KEY_ALIAS') ?: 'apply'
+                keyPassword System.getenv('APPLY_ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes { release {
+        minifyEnabled false
+        if (System.getenv('APPLY_ANDROID_KEYSTORE')) signingConfig signingConfigs.release
+    } }
+}
+dependencies {
+    androidTestImplementation 'androidx.test:core:1.7.0'
+    androidTestImplementation 'androidx.test:runner:1.7.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+}
+chaquopy {
+    defaultConfig {
+        version '3.12'
+        buildPython 'python3.12'
+        pip {
+            // Only the API engine is used. Android supplies RSA and encrypted storage.
+            // CLI/password/image extras of the unmodified upstream wheel are not loaded.
+            options '--no-deps'
+            install 'hh-applicant-tool==2.5.4'
+            install 'requests==2.32.5'
+            install 'certifi==2025.11.12'
+            install 'charset-normalizer==3.4.4'
+            install 'idna==3.11'
+            install 'urllib3==2.6.3'
+            install 'PySocks==1.7.1'
+            install 'tomli-w==1.2.0'
+            install 'portalocker==3.2.0'
+            install 'tzdata==2025.3'
+        }
+    }
+    sourceSets { main { srcDirs += '../../.build/android-python' } }
+}

@@ -10,10 +10,13 @@ DEST = ROOT / '.build' / 'publish'
 def files():
     values = list(ROOT.glob('*.py'))
     values += [ROOT / p for p in ('README.md', 'THIRD_PARTY_NOTICES.md', '.gitignore', 'requirements.txt', 'requirements-build.txt', 'start.command')]
-    for directory in ('defaults', 'desktop', 'scripts', 'tests', '.github', 'frontend/src', 'frontend/public', 'src-tauri/src', 'src-tauri/icons'):
+    for directory in ('defaults', 'desktop', 'scripts', 'tests', '.github', 'frontend/src', 'frontend/public', 'src-tauri/src', 'src-tauri/icons', 'android/app/src'):
         values += [p for p in (ROOT / directory).rglob('*') if p.is_file() and '__pycache__' not in p.parts]
     values += [ROOT / p for p in ('frontend/package.json', 'frontend/package-lock.json', 'frontend/index.html', 'frontend/tsconfig.json', 'frontend/vite.config.ts',
                'src-tauri/Entitlements.plist', 'src-tauri/Cargo.toml', 'src-tauri/Cargo.lock', 'src-tauri/build.rs', 'src-tauri/tauri.conf.json', 'src-tauri/binaries/.gitkeep')]
+    values += [ROOT / p for p in ('android/settings.gradle', 'android/build.gradle', 'android/gradle.properties', 'android/app/build.gradle')]
+    values += [ROOT / p for p in ('android/gradlew', 'android/gradlew.bat',
+               'android/gradle/wrapper/gradle-wrapper.jar', 'android/gradle/wrapper/gradle-wrapper.properties')]
     return sorted(set(values))
 
 

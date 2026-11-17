@@ -42,6 +42,7 @@ export type Run = {
 export type AppState = {
   revision: number;
   desktop?: boolean;
+  android?: boolean;
   running: boolean;
   waiting: boolean;
   phase: string;

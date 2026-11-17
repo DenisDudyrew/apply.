@@ -5,11 +5,13 @@ on:
       build_run_id:
         description: Successful Desktop installers run ID
         required: true
-        default: '43006090338'
+      android_build_run_id:
+        description: Optional successful signed Android APK run ID (same commit)
+        required: false
       release_tag:
         description: Release tag (vMAJOR.MINOR.PATCH or beta tag)
         required: true
-        default: v0.1.0-beta.1
+        default: v0.2.0
 permissions:
   contents: write
   actions: read
@@ -25,12 +27,13 @@ jobs:
       GH_REPO: ${{ github.repository }}
       BUILD_RUN_ID: ${{ inputs.build_run_id }}
       RELEASE_TAG: ${{ inputs.release_tag }}
+      ANDROID_BUILD_RUN_ID: ${{ inputs.android_build_run_id }}
     steps:
       - name: Verify successful build and release tag
         shell: bash
         run: |
           python - <<'PY'
-          import json, os, re, subprocess
+          import base64, json, os, re, subprocess
           run_id = os.environ['BUILD_RUN_ID']
           tag = os.environ['RELEASE_TAG']
           assert run_id.isdigit(), 'Invalid build run ID'
@@ -40,6 +43,16 @@ jobs:
           assert run['conclusion'] == 'success' and run['status'] == 'completed', 'Build must pass all platforms'
           assert run['path'] == '.github/workflows/desktop.yml', 'Unexpected build workflow'
           assert run['head_repository']['full_name'] == repo and run['head_branch'] == 'main', 'Unexpected source'
+          config = json.loads(base64.b64decode(json.loads(subprocess.check_output(['gh', 'api', f"repos/{repo}/contents/src-tauri/tauri.conf.json?ref={run['head_sha']}"]))['content']))
+          assert config['version'] == tag[1:].split('-')[0], 'Release tag does not match the built app version'
+          android_id = os.environ.get('ANDROID_BUILD_RUN_ID', '')
+          if android_id:
+              assert android_id.isdigit(), 'Invalid Android build run ID'
+              android = json.loads(subprocess.check_output(['gh', 'api', f'repos/{repo}/actions/runs/{android_id}']))
+              assert android['conclusion'] == 'success' and android['status'] == 'completed', 'Android build must pass'
+              assert android['path'] == '.github/workflows/android.yml', 'Unexpected Android build workflow'
+              assert android['head_repository']['full_name'] == repo and android['head_branch'] == 'main', 'Unexpected Android source'
+              assert android['head_sha'] == run['head_sha'], 'Desktop and Android must use the same commit'
           with open(os.environ['GITHUB_ENV'], 'a') as f:
               f.write('BUILD_SHA=' + run['head_sha'] + '\n')
           PY
@@ -49,6 +62,14 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ inputs.build_run_id }}
           pattern: Apply-*
+          path: ${{ runner.temp }}/installers
+      - uses: actions/download-artifact@v4
+        if: ${{ inputs.android_build_run_id != '' }}
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.android_build_run_id }}
+          pattern: Apply-Android
           path: ${{ runner.temp }}/installers
       - name: Prepare installers and checksums
         env:
@@ -64,6 +85,8 @@ jobs:
           packages = [('Windows-x64', '*-setup.exe', 'Windows-x64.exe'),
                       ('macOS-Apple-Silicon', '*.dmg', 'macOS-Apple-Silicon.dmg'),
                       ('macOS-Intel', '*.dmg', 'macOS-Intel.dmg')]
+          if os.environ.get('ANDROID_BUILD_RUN_ID'):
+              packages.append(('Android', '*.apk', 'Android.apk'))
           checksums = []
           for artifact, pattern, suffix in packages:
               matches = list((root / ('Apply-' + artifact)).rglob(pattern))
@@ -84,16 +107,23 @@ jobs:
 
           Внутри: профили резюме, подбор вакансий, шаблоны писем, сохранение очереди, журнал, пропуск анкет и ручной ввод капчи после двух пауз по 10 минут. Ожидание не гарантирует исчезновение капчи.
 
-          Это бета: Windows-пакет без сертификата издателя, Mac-пакеты с ad-hoc подписью без нотарификации Apple. Система может предупредить при первом запуске. Обновления устанавливаются вручную.
+          Windows-пакет без сертификата издателя, Mac-пакеты с ad-hoc подписью без нотарификации Apple. Система может предупредить при первом запуске. Обновления устанавливаются вручную.
 
           Личные резюме, токены и история разработчика в установщики не входят. Проверочные суммы находятся в `SHA256SUMS.txt`. Архивы Source code ниже — исходники, для установки выбирайте `.exe` или `.dmg`.
           ''')
+          if os.environ.get('ANDROID_BUILD_RUN_ID'):
+              with (out / 'notes.md').open('a') as notes:
+                  notes.write('\nAndroid 15+: установите файл `Android.apk`, разрешите уведомления Apply. Телефон работает самостоятельно; ход запуска и остановка доступны в постоянном уведомлении, капча и результат вызывают отдельное уведомление. Ручные анкеты остаются для проверки на hh.ru. Android может остановить фоновую службу по системным ограничениям — очередь сохраняется, продолжение выполняется вручную.\n')
           PY
       - name: Create draft, verify assets, and publish
         env:
           RELEASE_ROOT: ${{ runner.temp }}/release
         shell: bash
         run: |
-          gh release create "$RELEASE_TAG" --draft --prerelease --target "$BUILD_SHA" --title "Apply ${RELEASE_TAG#v} — Windows и macOS" --notes-file "$RELEASE_ROOT/notes.md" "$RELEASE_ROOT"/*.exe "$RELEASE_ROOT"/*.dmg "$RELEASE_ROOT/SHA256SUMS.txt"
-          gh release view "$RELEASE_TAG" --json assets --jq '.assets | length' | python -c 'import sys; assert int(sys.stdin.read()) == 4, "Incomplete release"'
+          assets=("$RELEASE_ROOT"/*.exe "$RELEASE_ROOT"/*.dmg "$RELEASE_ROOT/SHA256SUMS.txt")
+          if [[ -n "$ANDROID_BUILD_RUN_ID" ]]; then assets+=("$RELEASE_ROOT"/*.apk); fi
+          kind=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then kind+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" --draft "${kind[@]}" --target "$BUILD_SHA" --title "Apply ${RELEASE_TAG#v}" --notes-file "$RELEASE_ROOT/notes.md" "${assets[@]}"
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets | length' | python -c 'import os, sys; expected = 5 if os.environ.get("ANDROID_BUILD_RUN_ID") else 4; assert int(sys.stdin.read()) == expected, "Incomplete release"'
           gh release edit "$RELEASE_TAG" --draft=false

@@ -16,6 +16,9 @@ def key(directory):
 
 
 def load(directory):
+    if os.environ.get('APPLY_ANDROID') == '1':
+        from android_runtime import secrets_load
+        return secrets_load()
     path = directory / 'token.json'
     if not desktop():
         try:
@@ -33,6 +36,10 @@ def load(directory):
 
 
 def save(directory, token):
+    if os.environ.get('APPLY_ANDROID') == '1':
+        from android_runtime import secrets_save
+        secrets_save(token)
+        return
     if desktop():
         import keyring
         try:
@@ -47,6 +54,12 @@ def save(directory, token):
 
 
 def clear(directory):
+    if os.environ.get('APPLY_ANDROID') == '1':
+        from android_runtime import secrets_save
+        secrets_save({})
+        _CACHE.pop(str(directory), None)
+        (directory / 'token.json').unlink(missing_ok=True)
+        return
     if desktop():
         import keyring
         try:

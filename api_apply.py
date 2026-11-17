@@ -51,6 +51,9 @@ class Sender:
         self.resume_country = self.countries.get(str((resume.get('area') or {}).get('id')))
 
     def browser(self, vacancy):
+        import os
+        if os.environ.get('APPLY_ANDROID') == '1':
+            return 'review', 'Ручная анкета: откройте вакансию на hh.ru. Автоматическая отправка не выполнялась.'
         import hh_apply
         if self.ui is None:
             return 'review', 'Требуется ручная форма: откройте панель управления'

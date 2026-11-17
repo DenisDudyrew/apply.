@@ -59,6 +59,16 @@ def make_tool(ui=None):
     logging.getLogger('hh_applicant_tool').setLevel(logging.CRITICAL)
 
     class PanelTool(HHApplicantTool):
+
+
+        @classmethod
+        def _create_parser(cls):
+            if os.environ.get('APPLY_ANDROID') == '1':
+                # Mobile uses only this adapter, never upstream CLI operations.
+                import argparse
+                return argparse.ArgumentParser(add_help=False)
+            return super()._create_parser()
+
         def _save_token(self, token):
             import secret_store
             secret_store.save(AUTH_DIR, token)
@@ -97,6 +107,9 @@ def authenticate(username, ui):
     if not username or len(username) > 254:
         raise ValueError('Введите телефон или email аккаунта hh.ru.')
     with locked():
+        if os.environ.get('APPLY_ANDROID') == '1':
+            from android_runtime import authorize
+            return authorize(username, ui, make_tool)
         from hh_applicant_tool.operations import authorize
         tool = make_tool(ui)
         original = getattr(authorize, 'input', None)

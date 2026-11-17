@@ -47,6 +47,32 @@ class PanelChecks(unittest.TestCase):
         with self.assertRaises(KeyboardInterrupt):
             ui.check_stop()
 
+    def test_send_announces_start_and_confirmed_count(self):
+        saved_state = dict(ui.state)
+        try:
+            ui.reset_run(2, 'send')
+            with patch.object(hh_apply, 'main') as main, patch.object(ui, 'announce') as announce:
+                main.side_effect = lambda *args, **kwargs: ui.progress(sent=2)
+                ui.worker(True, 2, {})
+            self.assertEqual(announce.call_args_list[0].args[0], 'Отклики запущены')
+            self.assertEqual(announce.call_args_list[-1].args,
+                             ('Отклики завершены', 'Подтверждено откликов: 2. Проверьте итог в Apply.'))
+        finally:
+            ui.state.clear()
+            ui.state.update(saved_state)
+
+    def test_failed_run_notice_does_not_expose_exception_payload(self):
+        saved_state = dict(ui.state)
+        try:
+            ui.reset_run(2, 'send')
+            with patch.object(hh_apply, 'main', side_effect=RuntimeError('private payload')), patch.object(ui, 'announce') as announce:
+                ui.worker(True, 2, {})
+            self.assertEqual(announce.call_args_list[-1].args[0], 'Запуск требует внимания')
+            self.assertNotIn('private payload', str(announce.call_args_list))
+        finally:
+            ui.state.clear()
+            ui.state.update(saved_state)
+
 
 if __name__ == '__main__':
     unittest.main()

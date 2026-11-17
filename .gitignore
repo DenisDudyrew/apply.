@@ -22,3 +22,8 @@ ui-preview*.png
 /letter.txt
 .run.lock
 *.log
+android/.gradle/
+android/**/build/
+android/local.properties
+*.keystore
+*.jks
